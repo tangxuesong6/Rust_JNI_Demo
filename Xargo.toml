@@ -1,0 +1,5 @@
+#[dependencies.alloc]
+#[dependencies.panic_abort]
+#[dependencies.panic_unwind]
+[dependencies]
+std = { default-features = false }
