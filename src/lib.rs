@@ -1,8 +1,8 @@
-mod android_log_lite;
+use android_logger_lite as log;
 use jni::JNIEnv;
-use jni::objects::{JClass, JString};
+use jni::objects::{JClass, JObject, JString, JValue};
+use jni::strings::JNIString;
 use jni::sys::{jbyteArray, jstring};
-use crate::android_log_lite as log;
 
 #[no_mangle]
 pub extern "system" fn Java_com_jni_rust_RustNative_getStringFromRust(env: JNIEnv, _: JClass) -> jstring {
@@ -27,5 +27,17 @@ pub extern "system" fn Java_com_jni_rust_RustNative_callLog(_: JNIEnv, _: JClass
     log::w(tag.to_string(), "hello w".to_string());
     log::e(tag.to_string(), "hello e".to_string());
 }
+
+#[no_mangle]
+pub extern "system" fn Java_com_jni_rust_RustNative_syncCallback(env: JNIEnv, _: JClass, callback: JObject) {
+    let hello = "hello syncCallback";
+    let jni_string_hello = JNIString::from(hello);
+    let j_string_hello = env.new_string(jni_string_hello).unwrap();
+    let j_value_hello = JValue::from(j_string_hello);
+
+    env.call_method(callback, "onStringCallback", "(Ljava/lang/String;)V", &[j_value_hello]).unwrap();
+    env.call_method(callback, "onVoidCallback", "()V", &[]).unwrap();
+}
+
 
 
