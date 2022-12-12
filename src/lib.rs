@@ -1,3 +1,6 @@
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 use android_logger_lite as log;
 use jni::JNIEnv;
 use jni::objects::{JClass, JObject, JString, JValue};
@@ -37,6 +40,28 @@ pub extern "system" fn Java_com_jni_rust_RustNative_syncCallback(env: JNIEnv, _:
 
     env.call_method(callback, "onStringCallback", "(Ljava/lang/String;)V", &[j_value_hello]).unwrap();
     env.call_method(callback, "onVoidCallback", "()V", &[]).unwrap();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_jni_rust_RustNative_asyncCallback(env: JNIEnv, _: JClass, callback: JObject) {
+    let jvm = env.get_java_vm().unwrap();
+    let callback = env.new_global_ref(callback).unwrap();
+    let (tx, rx) = mpsc::channel();
+
+    let _ = thread::spawn(move || {
+        tx.send(()).unwrap();
+        let env = jvm.attach_current_thread().unwrap();
+        let hello = "hello syncCallback";
+        let jni_string_hello = JNIString::from(hello);
+        let j_string_hello = env.new_string(jni_string_hello).unwrap();
+        let j_value_hello = JValue::from(j_string_hello);
+
+        for _i in 0..6 {
+            env.call_method(&callback, "onStringCallback", "(Ljava/lang/String;)V", &[j_value_hello]).unwrap();
+            thread::sleep(Duration::from_millis(2000));
+        }
+    });
+    rx.recv().unwrap();
 }
 
 
