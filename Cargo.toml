@@ -7,6 +7,9 @@ edition = "2021"
 
 [dependencies]
 jni = "0.20.0"
+android_logger_lite = "0.1.0"
+
+
 
 [profile.release]
 lto = true
