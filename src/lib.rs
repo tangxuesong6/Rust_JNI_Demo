@@ -4,6 +4,8 @@ use std::time::Duration;
 use android_logger_lite as log;
 use jni::JNIEnv;
 use jni::objects::{JClass, JObject, JString, JValue};
+use jni::signature::Primitive::Void;
+use jni::signature::ReturnType;
 use jni::strings::JNIString;
 use jni::sys::{jbyteArray, jstring};
 
@@ -62,6 +64,36 @@ pub extern "system" fn Java_com_jni_rust_RustNative_asyncCallback(env: JNIEnv, _
         }
     });
     rx.recv().unwrap();
+}
+#[no_mangle]
+pub unsafe extern fn Java_com_jni_rust_RustNative_singleton(env: JNIEnv, _: JClass) {
+
+    let clz = match env.find_class("com/jni/rust/NativeSingleton") {
+        Ok(class) => { class }
+        Err(_) => {
+            panic!("can't find class NativeSingleton");
+        }
+    };
+    let instance_method_id = match env.get_static_method_id(clz, "getInstance", "()Lcom/jni/rust/NativeSingleton;") {
+        Ok(ins) => {ins}
+        Err(_) => {
+            panic!("can't find method NativeSingleton.getInstance");
+        }
+    };
+    let instance = match env.call_static_method_unchecked(clz, instance_method_id, ReturnType::Object, &[]) {
+        Ok(obj) => {obj}
+        Err(_) => {
+            panic!("can't call method getInstance");
+        }
+    };
+    let instance_obj = JObject::from(instance.l().unwrap());
+    let log_identity_hashcode = match env.get_method_id(clz, "logIdentityHashCode", "()V") {
+        Ok(get) => {get}
+        Err(_) => {
+            panic!("can't call method logIdentityHashCode");
+        }
+    };
+    env.call_method_unchecked(instance_obj, log_identity_hashcode, ReturnType::Primitive(Void), &[]).unwrap();
 }
 
 
