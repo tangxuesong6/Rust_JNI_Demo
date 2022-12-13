@@ -133,6 +133,7 @@ pub extern "system" fn Java_com_jni_rust_RustNative_getSignatureNormal(env: JNIE
     let md5 = JValue::from(md5);
     let message_digest_value = env.call_static_method(message_digest_clz, "getInstance",
                                                       "(Ljava/lang/String;)Ljava/security/MessageDigest;", &[md5]).unwrap();
+    let _reset = env.call_method(message_digest_value.l().unwrap(), "reset", "()V", &[]).unwrap();
     let _update = env.call_method(message_digest_value.l().unwrap(), "update", "([B)V", &[sign_value]).unwrap();
     let digest_value = env.call_method(message_digest_value.l().unwrap(), "digest", "()[B", &[]).unwrap();
 
