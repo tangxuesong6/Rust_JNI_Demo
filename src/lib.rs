@@ -147,7 +147,9 @@ pub extern "system" fn Java_com_jni_rust_RustNative_getSignatureNormal(env: JNIE
         .collect::<Vec<String>>().join("");
     log::d("sign".to_string(), format!("{}", hex_sign));
 
+    //rust String to JNIString
     let hex_sign = JNIString::from(hex_sign);
+    //JNIString to JString
     let hex_sign = env.new_string(hex_sign).unwrap();
     hex_sign.into_raw()
 }
