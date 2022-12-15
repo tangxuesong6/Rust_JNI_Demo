@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 jni = "0.20.0"
 android_logger_lite = "0.1.0"
+openssl = {version="0.10.43", features = ["vendored"]}
+zip = "0.6.3"
 
 
 [profile.release]

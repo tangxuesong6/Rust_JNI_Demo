@@ -1,5 +1,6 @@
+use std::{fs, thread};
+use std::io::Read;
 use std::sync::mpsc;
-use std::thread;
 use std::time::Duration;
 
 use android_logger_lite as log;
@@ -9,6 +10,10 @@ use jni::signature::Primitive::Void;
 use jni::signature::ReturnType;
 use jni::strings::JNIString;
 use jni::sys::{jbyteArray, jobjectArray, jstring};
+use openssl::hash::MessageDigest;
+use openssl::pkcs7::{Pkcs7, Pkcs7Flags};
+use openssl::stack::Stack;
+use openssl::x509::X509;
 
 #[no_mangle]
 pub extern "system" fn Java_com_jni_rust_RustNative_getStringFromRust(env: JNIEnv, _: JClass) -> jstring {
@@ -152,6 +157,103 @@ pub extern "system" fn Java_com_jni_rust_RustNative_getSignatureNormal(env: JNIE
     //JNIString to JString
     let hex_sign = env.new_string(hex_sign).unwrap();
     hex_sign.into_raw()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_jni_rust_RustNative_getSignatureOpenssl(env: JNIEnv, _: JClass) -> jstring {
+
+    let activity_thread_clz = match env.find_class("android/app/ActivityThread") {
+        Ok(activity_thread_clz) => activity_thread_clz,
+        Err(_) => panic!()
+    };
+    let application_value = match env.call_static_method(activity_thread_clz, "currentApplication", "()Landroid/app/Application;", &[]) {
+        Ok(application_value) => { application_value }
+        Err(_) => { panic!() }
+    };
+    let application = match application_value.l() {
+        Ok(application) => { application }
+        Err(_) => { panic!() }
+    };
+
+    let package_code_path = match env.call_method(application, "getPackageCodePath", "()Ljava/lang/String;", &[]) {
+        Ok(package_code_path) => { package_code_path }
+        Err(_) => { panic!() }
+    };
+
+    let package_code_path = match package_code_path.l() {
+        Ok(package_code_path) => { package_code_path }
+        Err(_) => { panic!() }
+    };
+    let package_code_path = JString::from(package_code_path);
+
+    let package_code_path = match env.get_string(package_code_path) {
+        Ok(package_code_path) => { package_code_path }
+        Err(_) => { panic!() }
+    };
+    let package_code_path: String = package_code_path.into();
+    log::d("openssl".to_string(), package_code_path.to_string());
+    let zip_file = match fs::File::open(package_code_path) {
+        Ok(zip_file) => { zip_file }
+        Err(_) => { panic!() }
+    };
+    let mut zip = match zip::ZipArchive::new(zip_file) {
+        Ok(zip) => { zip }
+        Err(_) => { panic!() }
+    };
+
+    for i in 0..zip.len() {
+        let mut file = match zip.by_index(i) {
+            Ok(file) => { file }
+            Err(_) => {
+                panic!()
+            }
+        };
+        if file.is_file() {
+            if file.name().contains("META-INF") && file.name().contains(".RSA") {
+                log::d("openssl".to_string(), file.name().to_string());
+                let mut file_bytes: Vec<u8> = vec![];
+                let _ = match file.read_to_end(&mut file_bytes) {
+                    Ok(_) => {}
+                    Err(_) => { panic!() }
+                };
+                let pkcs7 = match Pkcs7::from_der(file_bytes.as_slice()) {
+                    Ok(pkcs7) => { pkcs7 }
+                    Err(_) => { panic!() }
+                };
+
+                let empty_stack: Stack<X509> = match Stack::new() {
+                    Ok(empty_stack) => { empty_stack }
+                    Err(_) => { panic!() }
+                };
+                let pkcs7_flags = Pkcs7Flags::STREAM;
+                let stack = match pkcs7.signers(&empty_stack, pkcs7_flags) {
+                    Ok(stack) => { stack }
+                    Err(_) => { panic!() }
+                };
+
+                let x509_ref = match stack.get(0) {
+                    None => { panic!() }
+                    Some(x509_ref) => { x509_ref }
+                };
+                let digest_bytes = match x509_ref.digest(MessageDigest::md5()) {
+                    Ok(digest_bytes) => { digest_bytes }
+                    Err(_) => { panic!() }
+                };
+                let sign_bytes = digest_bytes.to_vec();
+                let hex_sign: String = sign_bytes.iter()
+                    .map(|b| format!("{:02x}", b).to_string())
+                    .collect::<Vec<String>>().join("");
+                log::d("openssl".to_string(), hex_sign.to_string());
+                let hex_sign = JNIString::from(hex_sign);
+                let hex_sign = env.new_string(hex_sign).unwrap();
+                return hex_sign.into_raw();
+            }
+        }
+    }
+    log::e("openssl".to_string(),"no signature found".to_string());
+    let result = JNIString::from("no signature found");
+    let result = env.new_string(result).unwrap();
+    result.into_raw()
 }
 
 
